@@ -46,25 +46,8 @@ public class PlayerController : MonoBehaviour
         }
 
         // --- Custom Cursor Setup ---
-        // Check if a crosshair texture is assigned.
-        if (crosshairTexture != null)
-        {
-            // Set the custom cursor. CursorMode.Auto uses software rendering.
-            Cursor.SetCursor(crosshairTexture, crosshairHotspot, CursorMode.Auto);
-            // Explicitly hide the default hardware cursor.
-            Cursor.visible = false;
-            // Ensure the cursor is not locked to the center of the screen.
-            Cursor.lockState = CursorLockMode.None;
-
-            UnityEngine.Debug.Log("Custom crosshair set successfully and default cursor hidden.");
-        }
-        else
-        {
-            UnityEngine.Debug.LogWarning("PlayerController: No crosshair texture assigned. Default mouse cursor will be used.");
-            // If no custom crosshair, ensure the default cursor is visible and unlocked.
-            Cursor.visible = true;
-            Cursor.lockState = CursorLockMode.None;
-        }
+        // Call a dedicated method to set up the cursor.
+        SetupCustomCursor();
 
         UnityEngine.Debug.Log("PlayerController Start method called. Player movement and aiming are now active.");
     }
@@ -75,6 +58,10 @@ public class PlayerController : MonoBehaviour
     /// </summary>
     void Update()
     {
+        // Ensure cursor state is maintained every frame, especially in editor.
+        // This helps prevent the default cursor from reappearing or the custom one from flickering.
+        SetupCustomCursor();
+
         // Only allow movement and aiming if the player is alive.
         if (playerHealth != null && playerHealth.IsAlive)
         {
@@ -121,6 +108,31 @@ public class PlayerController : MonoBehaviour
             // Slerp interpolates between two rotations. Time.deltaTime ensures frame-rate independence.
             // rotationSpeed controls how fast the rotation happens.
             transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, rotationSpeed * Time.deltaTime);
+        }
+    }
+
+    /// <summary>
+    /// Sets the custom cursor and ensures the default cursor is hidden.
+    /// This method is called in Start and Update to maintain cursor state.
+    /// </summary>
+    private void SetupCustomCursor()
+    {
+        if (crosshairTexture != null)
+        {
+            Cursor.SetCursor(crosshairTexture, crosshairHotspot, CursorMode.Auto);
+            Cursor.visible = false;
+            Cursor.lockState = CursorLockMode.None; // Ensure cursor is not locked
+        }
+        else
+        {
+            // If no custom crosshair, ensure the default cursor is visible and unlocked.
+            Cursor.visible = true;
+            Cursor.lockState = CursorLockMode.None;
+            // Only log warning once to avoid spamming console
+            if (Time.frameCount == 1) // Only log on the first frame
+            {
+                UnityEngine.Debug.LogWarning("PlayerController: No crosshair texture assigned. Default mouse cursor will be used.");
+            }
         }
     }
 }

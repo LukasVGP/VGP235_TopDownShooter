@@ -77,7 +77,9 @@ public class Bullet : MonoBehaviour
     void Update()
     {
         // Move the bullet forward based on its current rotation.
-        transform.Translate(Vector2.right * speed * Time.deltaTime); // Assumes bullet sprite faces right by default.
+        // Using transform.right is often the "forward" direction for 2D sprites
+        // when they are rotated to point correctly.
+        transform.position += transform.right * speed * Time.deltaTime;
 
         // Check if the bullet has traveled beyond its max distance.
         if (Vector2.Distance(startPosition, transform.position) >= maxDistance)
