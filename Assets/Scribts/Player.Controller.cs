@@ -51,18 +51,20 @@ public class PlayerController : MonoBehaviour
         {
             // Set the custom cursor. CursorMode.Auto uses software rendering.
             Cursor.SetCursor(crosshairTexture, crosshairHotspot, CursorMode.Auto);
-            UnityEngine.Debug.Log("Custom crosshair set successfully.");
+            // Explicitly hide the default hardware cursor.
+            Cursor.visible = false;
+            // Ensure the cursor is not locked to the center of the screen.
+            Cursor.lockState = CursorLockMode.None;
+
+            UnityEngine.Debug.Log("Custom crosshair set successfully and default cursor hidden.");
         }
         else
         {
             UnityEngine.Debug.LogWarning("PlayerController: No crosshair texture assigned. Default mouse cursor will be used.");
+            // If no custom crosshair, ensure the default cursor is visible and unlocked.
+            Cursor.visible = true;
+            Cursor.lockState = CursorLockMode.None;
         }
-
-        // Ensure the default hardware cursor is hidden if you're using a custom one.
-        // This line makes sure the system cursor is invisible, allowing your custom one to show.
-        // If you were to use a UI Image for your crosshair, you'd manage its visibility.
-        // For Cursor.SetCursor, it handles visibility, but this ensures no default cursor overlay.
-        // Cursor.visible = false; // Uncomment this if you still see the default cursor or want to explicitly hide it.
 
         UnityEngine.Debug.Log("PlayerController Start method called. Player movement and aiming are now active.");
     }
