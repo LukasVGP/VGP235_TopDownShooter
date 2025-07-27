@@ -23,6 +23,12 @@ public class PlayerController : MonoBehaviour
                                                             // of the crosshair texture that acts as its "hotspot" (center).
                                                             // For a 32x32 pixel crosshair, (16,16) is the center. Adjust for your image size.
 
+    [SerializeField]
+    [Tooltip("Adjust this value to align the player's gun with the aiming direction. " +
+             "If your character's gun points 'up' when rotation is 0, try -90. If it points 'right', try 0.")]
+    private float rotationOffset = -90f; // Default adjustment for sprites initially facing 'up' (Y-axis).
+                                         // You will likely need to tweak this value in the Inspector.
+
     // --- Private Internal References ---
     private Health playerHealth; // Reference to the player's Health component.
 
@@ -45,15 +51,18 @@ public class PlayerController : MonoBehaviour
         {
             // Set the custom cursor. CursorMode.Auto uses software rendering.
             Cursor.SetCursor(crosshairTexture, crosshairHotspot, CursorMode.Auto);
+            UnityEngine.Debug.Log("Custom crosshair set successfully.");
         }
         else
         {
             UnityEngine.Debug.LogWarning("PlayerController: No crosshair texture assigned. Default mouse cursor will be used.");
         }
 
-        // Optionally hide the default cursor entirely if you don't want any cursor at all
-        // or if your custom cursor is handled by a UI image instead of Cursor.SetCursor.
-        // Cursor.visible = false; // Uncomment this if Cursor.SetCursor isn't enough or you use a UI image for crosshair.
+        // Ensure the default hardware cursor is hidden if you're using a custom one.
+        // This line makes sure the system cursor is invisible, allowing your custom one to show.
+        // If you were to use a UI Image for your crosshair, you'd manage its visibility.
+        // For Cursor.SetCursor, it handles visibility, but this ensures no default cursor overlay.
+        // Cursor.visible = false; // Uncomment this if you still see the default cursor or want to explicitly hide it.
 
         UnityEngine.Debug.Log("PlayerController Start method called. Player movement and aiming are now active.");
     }
@@ -68,8 +77,6 @@ public class PlayerController : MonoBehaviour
         if (playerHealth != null && playerHealth.IsAlive)
         {
             // --- Player Movement Logic ---
-            // (Existing movement code remains the same)
-
             // Get horizontal and vertical input for WASD/Arrow keys
             float horizontalInput = Input.GetAxisRaw("Horizontal"); // A/D or Left/Right Arrow
             float verticalInput = Input.GetAxisRaw("Vertical");     // W/S or Up/Down Arrow
@@ -102,12 +109,8 @@ public class PlayerController : MonoBehaviour
             // positive rotation is counter-clockwise).
             float angle = Mathf.Atan2(directionToMouse.y, directionToMouse.x) * Mathf.Rad2Deg;
 
-            // Adjust the angle for your sprite's default orientation.
-            // If your sprite is facing "right" by default, no adjustment might be needed.
-            // If it's facing "up" by default, you might need to subtract 90 degrees (angle - 90).
-            // Experiment with this value. For many top-down sprites facing "up", -90 is common.
-            // For sprites facing "right", 0 or -90 might work depending on how you want the "front" to align.
-            angle -= 90f; // Common adjustment if your sprite's "forward" is initially "up" (Y-axis).
+            // Apply the adjustable rotation offset.
+            angle += rotationOffset; // Add the offset to align the sprite's "forward" with the aiming direction.
 
             // Create a target rotation quaternion from the calculated angle.
             Quaternion targetRotation = Quaternion.Euler(0f, 0f, angle);
