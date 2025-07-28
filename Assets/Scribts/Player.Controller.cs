@@ -2,8 +2,8 @@ using UnityEngine; // Required for Unity functionalities like MonoBehaviour, Inp
 
 /// <summary>
 /// Controls the movement and aiming of the player character in a 2D top-down game.
-/// This script handles WASD/arrow key movement, player rotation towards the mouse cursor,
-/// and custom crosshair display.
+/// This script handles forward movement in the mouse cursor's direction, player rotation towards the mouse cursor,
+/// and custom crosshair display using Cursor.SetCursor, visible only when the right mouse button is pressed.
 /// </summary>
 public class PlayerController : MonoBehaviour
 {
@@ -45,11 +45,29 @@ public class PlayerController : MonoBehaviour
             UnityEngine.Debug.LogError("PlayerController: No Health component found on the Player GameObject!");
         }
 
-        // --- Custom Cursor Setup ---
-        // Call a dedicated method to set up the cursor.
-        SetupCustomCursor();
+        // Initially, hide the custom crosshair and show the default cursor.
+        SetCursorVisibility(false);
 
         UnityEngine.Debug.Log("PlayerController Start method called. Player movement and aiming are now active.");
+    }
+
+    /// <summary>
+    /// Called when the object becomes enabled and active.
+    /// </summary>
+    void OnEnable()
+    {
+        // Ensure cursor is in its default hidden state when the script is enabled.
+        SetCursorVisibility(false);
+    }
+
+    /// <summary>
+    /// Called when the object becomes disabled or inactive.
+    /// </summary>
+    void OnDisable()
+    {
+        // When the script is disabled, revert to default cursor behavior.
+        Cursor.visible = true;
+        Cursor.lockState = CursorLockMode.None;
     }
 
     /// <summary>
@@ -58,78 +76,78 @@ public class PlayerController : MonoBehaviour
     /// </summary>
     void Update()
     {
-        // Ensure cursor state is maintained every frame, especially in editor.
-        // This helps prevent the default cursor from reappearing or the custom one from flickering.
-        SetupCustomCursor();
+        // Check if the right mouse button is held down to show the crosshair.
+        // We invert the boolean here to counteract the observed editor behavior.
+        bool showCrosshair = !Input.GetMouseButton(1); // Inverted: If button is held (true), this becomes false.
+                                                       // If button is NOT held (false), this becomes true.
+        SetCursorVisibility(showCrosshair); // Update cursor visibility based on mouse button state.
 
         // Only allow movement and aiming if the player is alive.
         if (playerHealth != null && playerHealth.IsAlive)
         {
-            // --- Player Movement Logic ---
-            // Get horizontal and vertical input for WASD/Arrow keys
-            float horizontalInput = Input.GetAxisRaw("Horizontal"); // A/D or Left/Right Arrow
-            float verticalInput = Input.GetAxisRaw("Vertical");     // W/S or Up/Down Arrow
-
-            // Create a movement vector based on input.
-            // Vector3.right is (1,0,0), Vector3.up is (0,1,0). For 2D top-down on XY plane.
-            Vector3 movement = new Vector3(horizontalInput, verticalInput, 0f).normalized;
-
-            // Apply movement to the player's position.
-            // Time.deltaTime ensures movement is frame-rate independent.
-            transform.position += movement * moveSpeed * Time.deltaTime;
-
-
-            // --- Player Aiming/Rotation Logic ---
-            // Get the mouse position in screen coordinates.
+            // --- Player Aiming/Rotation Logic (always happens) ---
             Vector3 mouseScreenPosition = Input.mousePosition;
-
-            // Convert the mouse screen position to world coordinates.
-            // The Z-coordinate needs to be set to the player's Z-coordinate for correct projection.
-            // If your game is strictly 2D on the XY plane, player.transform.position.z is usually 0.
-            // Make sure your camera's Z-position is negative (e.g., -10) to look down on the XY plane.
             mouseScreenPosition.z = Camera.main.WorldToScreenPoint(transform.position).z;
             Vector3 mouseWorldPosition = Camera.main.ScreenToWorldPoint(mouseScreenPosition);
 
-            // Calculate the direction vector from the player to the mouse position.
             Vector2 directionToMouse = (mouseWorldPosition - transform.position).normalized;
-
-            // Calculate the angle in degrees. Atan2 returns the angle in radians between the X-axis and a point (y, x).
-            // We convert it to degrees and adjust for Unity's coordinate system (0 degrees is usually positive X,
-            // positive rotation is counter-clockwise).
             float angle = Mathf.Atan2(directionToMouse.y, directionToMouse.x) * Mathf.Rad2Deg;
+            angle += rotationOffset;
 
-            // Apply the adjustable rotation offset.
-            angle += rotationOffset; // Add the offset to align the sprite's "forward" with the aiming direction.
-
-            // Create a target rotation quaternion from the calculated angle.
             Quaternion targetRotation = Quaternion.Euler(0f, 0f, angle);
-
-            // Smoothly rotate the player towards the target rotation.
-            // Slerp interpolates between two rotations. Time.deltaTime ensures frame-rate independence.
-            // rotationSpeed controls how fast the rotation happens.
             transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, rotationSpeed * Time.deltaTime);
+
+
+            // --- Player Movement Logic (moves relative to aimed direction) ---
+            float horizontalInput = Input.GetAxisRaw("Horizontal"); // A/D or Left/Right Arrow
+            float verticalInput = Input.GetAxisRaw("Vertical");     // W/S or Up/Down Arrow
+
+            Vector3 movement = (transform.right * verticalInput + transform.up * horizontalInput).normalized;
+            transform.position += movement * moveSpeed * Time.deltaTime;
         }
     }
 
     /// <summary>
-    /// Sets the custom cursor and ensures the default cursor is hidden.
-    /// This method is called in Start and Update to maintain cursor state.
+    /// Called when the application gains or loses focus.
+    /// Useful for managing cursor visibility and lock state in the editor.
     /// </summary>
-    private void SetupCustomCursor()
+    /// <param name="hasFocus">True if the application has focus, false otherwise.</param>
+    void OnApplicationFocus(bool hasFocus)
     {
-        if (crosshairTexture != null)
+        if (hasFocus)
+        {
+            // When the application gains focus, re-evaluate cursor visibility based on current mouse button state.
+            // We invert the logic here to counteract the observed editor behavior.
+            bool showCrosshair = !Input.GetMouseButton(1); // Check right mouse button
+            SetCursorVisibility(showCrosshair);
+        }
+        else
+        {
+            // When the application loses focus, show the default cursor so user can interact with editor.
+            Cursor.visible = true;
+            Cursor.lockState = CursorLockMode.None;
+        }
+    }
+
+    /// <summary>
+    /// Sets the custom cursor or default cursor based on the provided boolean.
+    /// </summary>
+    /// <param name="showCustom">If true, shows the custom crosshair; otherwise, shows the default cursor.</param>
+    private void SetCursorVisibility(bool showCustom)
+    {
+        if (showCustom && crosshairTexture != null)
         {
             Cursor.SetCursor(crosshairTexture, crosshairHotspot, CursorMode.Auto);
-            Cursor.visible = false;
+            Cursor.visible = false; // Hide default cursor
             Cursor.lockState = CursorLockMode.None; // Ensure cursor is not locked
         }
         else
         {
-            // If no custom crosshair, ensure the default cursor is visible and unlocked.
+            // If not showing custom, or if custom texture is not assigned, show default cursor.
             Cursor.visible = true;
             Cursor.lockState = CursorLockMode.None;
             // Only log warning once to avoid spamming console
-            if (Time.frameCount == 1) // Only log on the first frame
+            if (crosshairTexture == null && Time.frameCount == 1)
             {
                 UnityEngine.Debug.LogWarning("PlayerController: No crosshair texture assigned. Default mouse cursor will be used.");
             }
