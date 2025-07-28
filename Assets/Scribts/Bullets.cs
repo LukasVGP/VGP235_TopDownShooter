@@ -10,7 +10,7 @@ public class Bullet : MonoBehaviour
     private float speed = 20f; // How fast the bullet travels.
 
     [SerializeField]
-    private float damage = 10f; // Damage dealt to enemies.
+    private float damage = 25f; // Damage dealt to enemies. Set to 25% for handgun (4 hits to kill a 100 health enemy).
 
     [SerializeField]
     private float maxDistance = 10f; // How far the bullet can travel before being destroyed.
