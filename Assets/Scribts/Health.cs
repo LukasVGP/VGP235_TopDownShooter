@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.UI; // Required for Image component
 using TMPro; // Required for TextMeshPro UI elements
 
 /// <summary>
@@ -8,15 +9,19 @@ using TMPro; // Required for TextMeshPro UI elements
 public class Health : MonoBehaviour
 {
     // SerializeField makes private variables visible and editable in the Unity Inspector.
-    // This allows designers to easily tweak health values without changing code.
     [SerializeField]
     private float maxHealth = 100f; // The maximum health value for this entity.
 
-    // Reference to a TextMeshProUGUI component in the UI to display current health.
-    [SerializeField]
-    private TextMeshProUGUI healthTextDisplay;
-
     private float currentHealth; // The current health value.
+
+    [Header("UI Display (Player Only)")]
+    [SerializeField]
+    [Tooltip("Assign the TextMeshProUGUI element to display health text (e.g., 'Health: 100/100').")]
+    private TextMeshProUGUI healthTextDisplay; // Reference to a TextMeshProUGUI component in the UI.
+
+    [SerializeField]
+    [Tooltip("Assign the UI Image that will act as the health bar fill (the red bar).")]
+    private Image healthBarFillImage; // Reference to the UI Image for the health bar fill.
 
     /// <summary>
     /// Property to check if the entity is currently alive (health > 0).
@@ -32,7 +37,7 @@ public class Health : MonoBehaviour
     {
         currentHealth = maxHealth; // Start with full health.
         UpdateHealthUI(); // Update the UI display immediately.
-        UnityEngine.Debug.Log($"{gameObject.name} Health Initialized: {currentHealth}/{maxHealth}");
+        UnityEngine.Debug.Log($"{gameObject.name} Health Initialized: {currentHealth}/{maxHealth}. IsAlive: {IsAlive}"); // Added log
     }
 
     /// <summary>
@@ -52,14 +57,15 @@ public class Health : MonoBehaviour
         }
 
         UpdateHealthUI(); // Update the UI display after taking damage.
-        UnityEngine.Debug.Log($"{gameObject.name} Health: {currentHealth}/{maxHealth}");
+        UnityEngine.Debug.Log($"{gameObject.name} Health: {currentHealth}/{maxHealth}. IsAlive: {IsAlive}"); // Added log
 
         // If health drops to zero or below, the entity is no longer alive.
         if (!IsAlive)
         {
             UnityEngine.Debug.Log($"{gameObject.name} has been defeated!");
-            // Here you would typically add logic for death, e.g., playing an animation, destroying the GameObject.
-            // Example: Destroy(gameObject); // Uncomment to destroy the GameObject on death.
+            // Notify other scripts that this entity has died.
+            // For enemies, this is where they'd notify the GameManager for score.
+            SendMessage("OnDeath", SendMessageOptions.DontRequireReceiver); // Calls OnDeath on this GameObject's scripts.
         }
     }
 
@@ -80,18 +86,24 @@ public class Health : MonoBehaviour
         }
 
         UpdateHealthUI(); // Update the UI display after healing.
-        UnityEngine.Debug.Log($"{gameObject.name} Health Restored: {currentHealth}/{maxHealth}");
+        UnityEngine.Debug.Log($"{gameObject.name} Health Restored: {currentHealth}/{maxHealth}. IsAlive: {IsAlive}"); // Added log
     }
 
     /// <summary>
-    /// Updates the TextMeshPro UI element with the current health value.
+    /// Updates the TextMeshPro UI element and the health bar fill.
     /// </summary>
     private void UpdateHealthUI()
     {
+        // Update health text display
         if (healthTextDisplay != null)
         {
-            // Format the health display to show current/max health.
             healthTextDisplay.text = $"Health: {currentHealth:F0}/{maxHealth:F0}"; // :F0 formats to 0 decimal places.
+        }
+
+        // Update health bar fill amount
+        if (healthBarFillImage != null)
+        {
+            healthBarFillImage.fillAmount = currentHealth / maxHealth;
         }
     }
 }
