@@ -91,14 +91,15 @@ public class Bullet : MonoBehaviour
     /// <param name="other">The other Collider2D involved in this collision.</param>
     void OnTriggerEnter2D(Collider2D other)
     {
-        // Check if the collided object has a Health component (e.g., an enemy).
-        Health targetHealth = other.GetComponent<Health>();
-        if (targetHealth != null)
+        // Try to get the EnemyController component from the collided object.
+        EnemyController enemy = other.GetComponent<EnemyController>();
+        if (enemy != null)
         {
-            targetHealth.DoDamage(damage); // Apply damage to the target.
-            Destroy(gameObject); // Destroy the bullet after hitting something with health.
+            // If it's an enemy, call its TakeHit method.
+            enemy.TakeHit(damage, transform.position); // Pass bullet damage and position for knockback.
+            Destroy(gameObject); // Destroy the bullet after hitting an enemy.
         }
         // Optionally, destroy the bullet if it hits something else like a wall,
-        // but for now, it only destroys on health target hit or max distance.
+        // but for now, it only destroys on enemy hit or max distance.
     }
 }

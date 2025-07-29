@@ -12,7 +12,12 @@ public class EnemyController : MonoBehaviour
     [Header("Movement Settings")]
     [SerializeField]
     private float moveSpeed = 2f; // Speed at which the zombie moves towards the player.
+    [SerializeField]
+    [Tooltip("Adjust this value to align the zombie's sprite 'front' with its movement direction.")]
+    private float rotationOffset = -90f; // Default adjustment for sprites initially facing 'up' (Y-axis).
+                                         // You will likely need to tweak this value in the Inspector.
     private Transform playerTransform; // Reference to the player's Transform.
+    private bool isKnockedBack = false; // Flag to indicate if the zombie is currently being knocked back.
 
     [Header("Combat Settings")]
     [SerializeField]
@@ -24,6 +29,15 @@ public class EnemyController : MonoBehaviour
     private Health playerHealth;       // Reference to the player's Health script.
     private Health enemyHealth;        // Reference to this zombie's own Health script.
     private bool isPlayerInContact = false;   // True if player is currently touching the zombie.
+
+    [Header("Hit Feedback")] // Added Header for organization
+    [SerializeField]
+    private AudioClip hitSound; // Sound played when the zombie is hit by a bullet.
+    [SerializeField]
+    private float knockbackForce = 0.5f; // How far the zombie is pushed back when hit.
+    [SerializeField]
+    private float knockbackDuration = 0.1f; // How long the knockback effect lasts.
+
 
     [Header("Audio Settings")]
     [SerializeField]
@@ -157,8 +171,8 @@ public class EnemyController : MonoBehaviour
             bool isPlayerInProximity = (distanceToPlayer <= proximityRange);
 
 
-            // --- Movement Logic: Move towards player ONLY if player is alive AND in proximity ---
-            if (playerTransform != null && playerHealth != null && playerHealth.IsAlive && isPlayerInProximity)
+            // --- Movement Logic: Move towards player ONLY if player is alive AND in proximity AND not knocked back ---
+            if (playerTransform != null && playerHealth != null && playerHealth.IsAlive && isPlayerInProximity && !isKnockedBack)
             {
                 // Calculate direction to player.
                 Vector2 directionToPlayer = (playerTransform.position - transform.position).normalized;
@@ -166,9 +180,9 @@ public class EnemyController : MonoBehaviour
                 // Move towards the player.
                 transform.position = Vector2.MoveTowards(transform.position, playerTransform.position, moveSpeed * Time.deltaTime);
 
-                // Optional: Rotate to face the player (uncomment if your sprite needs rotation to face direction of movement)
-                // float angle = Mathf.Atan2(directionToPlayer.y, directionToPlayer.x) * Mathf.Rad2Deg;
-                // transform.rotation = Quaternion.Euler(0f, 0f, angle);
+                // Rotate to face the player (using the rotation offset).
+                float angle = Mathf.Atan2(directionToPlayer.y, directionToPlayer.x) * Mathf.Rad2Deg;
+                transform.rotation = Quaternion.Euler(0f, 0f, angle + rotationOffset);
             }
 
             // --- Damage Logic: Deal damage to player if in contact ---
@@ -184,10 +198,60 @@ public class EnemyController : MonoBehaviour
         }
         else // Zombie is dead
         {
-            // Call OnDeath handler (can be called multiple times if not careful, but OnDeath method handles single execution)
+            // Call OnDeath handler (ensures death logic runs only once).
             OnDeath();
         }
     }
+
+    /// <summary>
+    /// Public method for other scripts (like Bullet.cs) to call when this enemy is hit.
+    /// </summary>
+    /// <param name="damageAmount">The amount of damage to take.</param>
+    /// <param name="hitPosition">The world position where the hit occurred (e.g., bullet's position).</param>
+    public void TakeHit(float damageAmount, Vector2 hitPosition)
+    {
+        if (enemyHealth == null || !enemyHealth.IsAlive) return; // Can't take hit if no health component or already dead.
+
+        enemyHealth.DoDamage(damageAmount); // Apply damage to the zombie's health.
+
+        // Play hit sound.
+        if (hitSound != null && audioSource != null)
+        {
+            audioSource.PlayOneShot(hitSound);
+        }
+
+        // Apply knockback.
+        Vector2 knockbackDirection = (Vector2)transform.position - hitPosition;
+        knockbackDirection.Normalize(); // Ensure it's a unit vector.
+        StartCoroutine(ApplyKnockback(knockbackDirection));
+    }
+
+
+    /// <summary>
+    /// Coroutine to apply a temporary knockback effect to the zombie.
+    /// </summary>
+    /// <param name="direction">The normalized direction to apply knockback.</param>
+    /// <returns>IEnumerator for coroutine execution.</returns>
+    private IEnumerator ApplyKnockback(Vector2 direction)
+    {
+        isKnockedBack = true; // Set flag to temporarily stop normal movement.
+        float timer = 0f;
+        Vector2 initialPosition = transform.position;
+        Vector2 targetPosition = initialPosition + direction * knockbackForce;
+
+        while (timer < knockbackDuration)
+        {
+            // Move towards the target knockback position.
+            transform.position = Vector2.Lerp(initialPosition, targetPosition, timer / knockbackDuration);
+            timer += Time.deltaTime;
+            yield return null; // Wait for the next frame.
+        }
+
+        // Ensure zombie is at the end of its knockback path.
+        transform.position = targetPosition;
+        isKnockedBack = false; // Allow normal movement to resume.
+    }
+
 
     /// <summary>
     /// Handles the zombie's death logic. Called when enemyHealth.IsAlive becomes false.
