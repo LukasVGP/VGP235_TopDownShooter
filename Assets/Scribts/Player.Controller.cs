@@ -83,7 +83,8 @@ public class PlayerController : MonoBehaviour
         SetCursorVisibility(showCrosshair); // Update cursor visibility based on mouse button state.
 
         // Only allow movement and aiming if the player is alive.
-        if (playerHealth != null && playerHealth.IsAlive)
+        // Also ensure game is not paused (Time.timeScale > 0)
+        if (playerHealth != null && playerHealth.IsAlive && Time.timeScale > 0)
         {
             // --- Player Aiming/Rotation Logic (always happens) ---
             Vector3 mouseScreenPosition = Input.mousePosition;

@@ -4,7 +4,8 @@ using System.Collections; // Required for Coroutines
 /// <summary>
 /// Controls the behavior of a zombie enemy in a 2D top-down game.
 /// Handles movement towards the player (only when in proximity), damage to the player on contact,
-/// plays different moaning sounds based on player proximity, and awards points on death.
+/// plays different moaning sounds based on player proximity, awards points on death,
+/// and provides visual/audio feedback when hit by bullets.
 /// </summary>
 public class EnemyController : MonoBehaviour
 {
@@ -30,14 +31,13 @@ public class EnemyController : MonoBehaviour
     private Health enemyHealth;        // Reference to this zombie's own Health script.
     private bool isPlayerInContact = false;   // True if player is currently touching the zombie.
 
-    [Header("Hit Feedback")] // Added Header for organization
+    [Header("Hit Feedback")]
     [SerializeField]
     private AudioClip hitSound; // Sound played when the zombie is hit by a bullet.
     [SerializeField]
     private float knockbackForce = 0.5f; // How far the zombie is pushed back when hit.
     [SerializeField]
     private float knockbackDuration = 0.1f; // How long the knockback effect lasts.
-
 
     [Header("Audio Settings")]
     [SerializeField]
@@ -79,9 +79,8 @@ public class EnemyController : MonoBehaviour
         }
         else
         {
-            UnityEngine.Debug.Log($"{gameObject.name} Health component found. Initial IsAlive: {enemyHealth.IsAlive}"); // Added log
+            UnityEngine.Debug.Log($"{gameObject.name} Health component found. Initial IsAlive: {enemyHealth.IsAlive}");
         }
-
 
         // Get SpriteRenderer and set initial sprite.
         spriteRenderer = GetComponent<SpriteRenderer>();
@@ -136,18 +135,13 @@ public class EnemyController : MonoBehaviour
         }
 
         // Find the GameManager in the scene.
-        GameObject gameManagerObject = GameObject.FindWithTag("GameManager");
-        if (gameManagerObject != null)
+        if (GameManager.Instance != null) // Use GameManager singleton
         {
-            gameManager = gameManagerObject.GetComponent<GameManager>();
-            if (gameManager == null)
-            {
-                UnityEngine.Debug.LogError("EnemyController: GameObject tagged 'GameManager' has no GameManager script!");
-            }
+            gameManager = GameManager.Instance;
         }
         else
         {
-            UnityEngine.Debug.LogWarning("EnemyController: GameManager GameObject not found! Ensure a GameObject with GameManager script is tagged 'GameManager'.");
+            UnityEngine.Debug.LogWarning("EnemyController: GameManager Instance not found! Ensure a GameObject with GameManager script is in the scene.");
         }
     }
 
@@ -268,6 +262,7 @@ public class EnemyController : MonoBehaviour
         if (gameManager != null)
         {
             gameManager.AddScore(scoreValue);
+            gameManager.EnemyKilled(); // Notify GameManager that an enemy was killed.
         }
         else
         {
@@ -275,14 +270,18 @@ public class EnemyController : MonoBehaviour
         }
 
         // Set death sprite.
-        if (deathSprite != null)
+        if (spriteRenderer.sprite != deathSprite) // Only change sprite if it's not already the death sprite
         {
-            spriteRenderer.sprite = deathSprite;
+            if (deathSprite != null)
+            {
+                spriteRenderer.sprite = deathSprite;
+            }
+            else
+            {
+                UnityEngine.Debug.LogWarning($"{gameObject.name}: Death Sprite not assigned.");
+            }
         }
-        else
-        {
-            UnityEngine.Debug.LogWarning($"{gameObject.name}: Death Sprite not assigned.");
-        }
+
 
         // Stop movement
         moveSpeed = 0;

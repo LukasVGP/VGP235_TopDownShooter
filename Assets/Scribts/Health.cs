@@ -4,7 +4,7 @@ using TMPro; // Required for TextMeshPro UI elements
 
 /// <summary>
 /// Manages the health of a GameObject.
-/// Can be attached to both players and enemies.
+/// Can be attached to both players and enemies. Notifies GameManager on death.
 /// </summary>
 public class Health : MonoBehaviour
 {
@@ -37,7 +37,7 @@ public class Health : MonoBehaviour
     {
         currentHealth = maxHealth; // Start with full health.
         UpdateHealthUI(); // Update the UI display immediately.
-        UnityEngine.Debug.Log($"{gameObject.name} Health Initialized: {currentHealth}/{maxHealth}. IsAlive: {IsAlive}"); // Added log
+        UnityEngine.Debug.Log($"{gameObject.name} Health Initialized: {currentHealth}/{maxHealth}. IsAlive: {IsAlive}");
     }
 
     /// <summary>
@@ -57,15 +57,23 @@ public class Health : MonoBehaviour
         }
 
         UpdateHealthUI(); // Update the UI display after taking damage.
-        UnityEngine.Debug.Log($"{gameObject.name} Health: {currentHealth}/{maxHealth}. IsAlive: {IsAlive}"); // Added log
+        UnityEngine.Debug.Log($"{gameObject.name} Health: {currentHealth}/{maxHealth}. IsAlive: {IsAlive}");
 
         // If health drops to zero or below, the entity is no longer alive.
         if (!IsAlive)
         {
             UnityEngine.Debug.Log($"{gameObject.name} has been defeated!");
-            // Notify other scripts that this entity has died.
-            // For enemies, this is where they'd notify the GameManager for score.
-            SendMessage("OnDeath", SendMessageOptions.DontRequireReceiver); // Calls OnDeath on this GameObject's scripts.
+            // Notify other scripts on this GameObject (like EnemyController) about death.
+            SendMessage("OnDeath", SendMessageOptions.DontRequireReceiver);
+
+            // If this is the player, notify the GameManager directly.
+            if (gameObject.CompareTag("Player"))
+            {
+                if (GameManager.Instance != null)
+                {
+                    GameManager.Instance.PlayerDied();
+                }
+            }
         }
     }
 
@@ -75,7 +83,8 @@ public class Health : MonoBehaviour
     /// <param name="amount">The amount of health to restore.</param>
     public void Heal(float amount)
     {
-        if (!IsAlive) return; // Cannot heal if already defeated (unless specific game logic allows revival).
+        // Only heal if not already at max health or if dead (for revival scenarios).
+        if (currentHealth >= maxHealth) return;
 
         currentHealth += amount; // Increase health.
 
@@ -86,7 +95,17 @@ public class Health : MonoBehaviour
         }
 
         UpdateHealthUI(); // Update the UI display after healing.
-        UnityEngine.Debug.Log($"{gameObject.name} Health Restored: {currentHealth}/{maxHealth}. IsAlive: {IsAlive}"); // Added log
+        UnityEngine.Debug.Log($"{gameObject.name} Health Restored: {currentHealth}/{maxHealth}. IsAlive: {IsAlive}");
+    }
+
+    /// <summary>
+    /// Resets the entity's health to full.
+    /// </summary>
+    public void ResetHealth()
+    {
+        currentHealth = maxHealth;
+        UpdateHealthUI();
+        UnityEngine.Debug.Log($"{gameObject.name} Health Reset to Full.");
     }
 
     /// <summary>
