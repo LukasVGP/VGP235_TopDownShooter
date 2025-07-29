@@ -1,9 +1,45 @@
 using UnityEngine;
 using System.Collections; // Required for Coroutines
+using System.Collections.Generic; // Required for List
 
 /// <summary>
-/// Manages weapon firing, muzzle flash effects, and bullet spawning.
-/// This script should be attached to the player or a dedicated weapon GameObject.
+/// Defines the configuration for a single weapon type.
+/// [System.Serializable] makes this class visible in the Unity Inspector.
+/// </summary>
+[System.Serializable]
+public class WeaponConfig
+{
+    public string weaponName = "New Weapon"; // Name for display/identification.
+    public WeaponController.WeaponType weaponType = WeaponController.WeaponType.Single;
+
+    [Header("Visuals & Audio")]
+    public GameObject bulletPrefab; // The bullet prefab for this weapon.
+    public GameObject muzzleFlashPrefab; // The muzzle flash prefab for this weapon.
+    public AudioClip shootingSound; // The shooting sound for this weapon.
+    public Sprite playerWeaponSprite; // The player's sprite when this weapon is equipped.
+    [Tooltip("Assign the specific MuzzleEndPoint child GameObject for this weapon.")]
+    public Transform muzzleEndPointOverride; // Specific muzzle end point for this weapon.
+    public float muzzleFlashDuration = 0.1f; // How long the muzzle flash stays visible for this weapon.
+
+
+    [Header("Combat Stats")]
+    public float damage = 10f; // Damage dealt by this weapon's bullets.
+    public float fireRate = 0.5f; // Time between shots (seconds).
+    [Range(0.1f, 1.0f)]
+    [Tooltip("Bullet travel distance as a fraction of the map width (e.g., 0.25 for 1/4, 0.75 for 3/4).")]
+    public float bulletRangeFraction = 0.5f; // How far the bullet travels as a fraction of map width.
+
+    [Header("Shotgun Specific (if applicable)")]
+    [Range(1, 20)] // Clamp value between 1 and 20 for reasonable shotgun pellets.
+    public int shotgunPellets = 6; // Number of bullets for shotgun.
+    [Range(0f, 30f)] // Max spread angle in degrees.
+    public float shotgunSpreadAngle = 10f; // Total angle of spread for shotgun pellets.
+}
+
+
+/// <summary>
+/// Manages weapon firing, muzzle flash effects, bullet spawning, and weapon switching.
+/// This script should be attached to the player GameObject.
 /// </summary>
 public class WeaponController : MonoBehaviour
 {
@@ -11,50 +47,43 @@ public class WeaponController : MonoBehaviour
     public enum WeaponType { Single, Shotgun }
 
     // --- Configurable Variables (visible in Inspector) ---
-    [Header("Weapon Settings")]
+    [Header("Weapon Configurations")]
     [SerializeField]
-    private WeaponType currentWeaponType = WeaponType.Single; // Type of firing (single shot or shotgun spread).
+    private List<WeaponConfig> weapons = new List<WeaponConfig>(); // List of all available weapon configurations.
 
     [SerializeField]
-    private float fireRate = 0.5f; // Time between shots (seconds). Lower value = faster firing.
+    private int startingWeaponIndex = 0; // Index of the weapon to start with (0 for first weapon in list).
 
+    [Header("Game World Dimensions (for bullet range calculation)")]
     [SerializeField]
-    private GameObject bulletPrefab; // Assign your Bullet Prefab here.
-
+    [Tooltip("The approximate width of your playable map area in Unity units.")]
+    private float mapWidth = 20f; // Example: If your camera view is 10 units high, width might be 10 * aspect ratio.
     [SerializeField]
-    private Transform muzzleEndPoint; // Assign an empty GameObject here, positioned at the end of the gun muzzle.
-
-    [Header("Muzzle Flash Settings")]
-    [SerializeField]
-    private GameObject muzzleFlashPrefab; // Assign your Muzzle Flash Prefab here.
-                                          // This should be a GameObject containing a SpriteRenderer for the flash.
-
-    [SerializeField]
-    private float muzzleFlashDuration = 0.1f; // How long the muzzle flash stays visible.
-
-    [Header("Audio Settings")]
-    [SerializeField]
-    private AudioClip shootingSound; // Assign your shooting sound effect here.
-    private AudioSource audioSource; // Reference to the AudioSource component.
-
-    [Header("Shotgun Specific Settings")]
-    [SerializeField]
-    [Range(1, 20)] // Clamp value between 1 and 20 for reasonable shotgun pellets.
-    private int shotgunPellets = 12; // Number of bullets for shotgun.
-
-    [SerializeField]
-    [Range(0f, 30f)] // Max spread angle in degrees.
-    private float shotgunSpreadAngle = 10f; // Total angle of spread for shotgun pellets.
+    [Tooltip("The approximate height of your playable map area in Unity units.")]
+    private float mapHeight = 15f; // Example: If your camera orthographic size is 5, height is 10 units.
 
     // --- Private Internal State Variables ---
+    private int currentWeaponIndex; // Index of the currently active weapon in the 'weapons' list.
+    private WeaponConfig currentWeapon; // Reference to the currently active weapon's configuration.
     private float nextFireTime = 0f; // Timer to control fire rate.
+    private AudioSource audioSource; // Reference to the AudioSource component.
+    private SpriteRenderer playerSpriteRenderer; // Reference to the player's SpriteRenderer.
+
 
     /// <summary>
     /// Called when the script instance is being loaded.
-    /// Gets or adds an AudioSource component.
+    /// Initializes references and sets up AudioSource.
     /// </summary>
     void Awake()
     {
+        // Get the player's SpriteRenderer to update their visual.
+        playerSpriteRenderer = GetComponent<SpriteRenderer>();
+        if (playerSpriteRenderer == null)
+        {
+            UnityEngine.Debug.LogError("WeaponController: No SpriteRenderer found on the Player GameObject! Cannot update player sprite.");
+        }
+
+        // Get or add an AudioSource component to this GameObject.
         audioSource = GetComponent<AudioSource>();
         if (audioSource == null)
         {
@@ -63,27 +92,68 @@ public class WeaponController : MonoBehaviour
             audioSource.spatialBlend = 0; // 2D sound.
         }
 
-        // Ensure muzzle flash is initially off if it's a child GameObject.
-        if (muzzleFlashPrefab != null)
-        {
-            // If muzzleFlashPrefab is a child of this GameObject, ensure it's inactive.
-            // If it's a separate prefab, this check might not be directly applicable here.
-            // For a prefab, we'll instantiate and then activate/deactivate.
-        }
+        // Set the initial weapon.
+        SwitchWeapon(startingWeaponIndex);
     }
 
     /// <summary>
     /// Update is called once per frame.
-    /// Checks for player input to fire the weapon.
+    /// Checks for player input to fire the weapon and switch weapons.
     /// </summary>
     void Update()
     {
+        // --- Weapon Firing Logic ---
         // Check for left mouse button click and fire rate cooldown.
-        // Input.GetButton("Fire1") maps to left mouse button by default.
         if (Input.GetButton("Fire1") && Time.time >= nextFireTime)
         {
             FireWeapon();
-            nextFireTime = Time.time + fireRate; // Set next allowed fire time.
+            nextFireTime = Time.time + currentWeapon.fireRate; // Use current weapon's fire rate.
+        }
+
+        // --- Weapon Switching Logic ---
+        // Example: Use number keys 1, 2, 3 to switch weapons.
+        // Input.GetKeyDown checks for a key press only once.
+        if (Input.GetKeyDown(KeyCode.Alpha1)) // Alpha1 is the '1' key above QWERTY.
+        {
+            SwitchWeapon(0); // Switch to the first weapon in the list (Handgun).
+        }
+        if (Input.GetKeyDown(KeyCode.Alpha2))
+        {
+            SwitchWeapon(1); // Switch to the second weapon (Rifle).
+        }
+        if (Input.GetKeyDown(KeyCode.Alpha3))
+        {
+            SwitchWeapon(2); // Switch to the third weapon (Shotgun).
+        }
+        // Add more AlphaX checks for more weapons if needed.
+    }
+
+    /// <summary>
+    /// Switches the currently active weapon.
+    /// </summary>
+    /// <param name="weaponIndex">The index of the weapon in the 'weapons' list to switch to.</param>
+    private void SwitchWeapon(int weaponIndex)
+    {
+        if (weaponIndex >= 0 && weaponIndex < weapons.Count)
+        {
+            currentWeaponIndex = weaponIndex;
+            currentWeapon = weapons[currentWeaponIndex]; // Set the current weapon config.
+
+            // Update player's sprite to match the new weapon.
+            if (playerSpriteRenderer != null && currentWeapon.playerWeaponSprite != null)
+            {
+                playerSpriteRenderer.sprite = currentWeapon.playerWeaponSprite;
+            }
+            else if (playerSpriteRenderer != null)
+            {
+                UnityEngine.Debug.LogWarning($"WeaponController: Player sprite for weapon '{currentWeapon.weaponName}' is not assigned. Player sprite might not update visually.");
+            }
+
+            UnityEngine.Debug.Log($"Switched to weapon: {currentWeapon.weaponName}");
+        }
+        else
+        {
+            UnityEngine.Debug.LogWarning($"WeaponController: Invalid weapon index {weaponIndex}. Not switching weapon.");
         }
     }
 
@@ -93,54 +163,68 @@ public class WeaponController : MonoBehaviour
     /// </summary>
     private void FireWeapon()
     {
-        if (muzzleEndPoint == null)
+        // Use the muzzleEndPointOverride from the current weapon config.
+        Transform activeMuzzleEndPoint = currentWeapon.muzzleEndPointOverride;
+
+        if (activeMuzzleEndPoint == null)
         {
-            UnityEngine.Debug.LogError("WeaponController: Muzzle End Point is not assigned! Cannot fire weapon.");
+            UnityEngine.Debug.LogError($"WeaponController: Muzzle End Point for {currentWeapon.weaponName} is not assigned! Cannot fire weapon.");
             return;
         }
-        if (bulletPrefab == null)
+        if (currentWeapon.bulletPrefab == null)
         {
-            UnityEngine.Debug.LogError("WeaponController: Bullet Prefab is not assigned! Cannot fire weapon.");
+            UnityEngine.Debug.LogError($"WeaponController: Bullet Prefab for {currentWeapon.weaponName} is not assigned! Cannot fire weapon.");
             return;
         }
 
         // 1. Play Shooting Sound
-        if (shootingSound != null && audioSource != null)
+        if (currentWeapon.shootingSound != null && audioSource != null)
         {
-            audioSource.PlayOneShot(shootingSound);
+            audioSource.PlayOneShot(currentWeapon.shootingSound);
         }
 
         // 2. Show Muzzle Flash
-        StartCoroutine(ShowMuzzleFlash());
+        StartCoroutine(ShowMuzzleFlash(activeMuzzleEndPoint));
 
         // 3. Spawn Bullets
-        if (currentWeaponType == WeaponType.Single)
+        float calculatedMaxDistance = Mathf.Max(mapWidth, mapHeight) * currentWeapon.bulletRangeFraction; // Use larger dimension for range.
+
+        if (currentWeapon.weaponType == WeaponType.Single)
         {
-            SpawnBullet(muzzleEndPoint.rotation); // Single bullet, uses player's current rotation.
+            // For single shot, the bullet's rotation is the same as the muzzle end point's.
+            GameObject bulletInstance = Instantiate(currentWeapon.bulletPrefab, activeMuzzleEndPoint.position, activeMuzzleEndPoint.rotation);
+            // Pass the damage and maxDistance to the bullet.
+            Bullet bulletScript = bulletInstance.GetComponent<Bullet>();
+            if (bulletScript != null)
+            {
+                bulletScript.damage = currentWeapon.damage;
+                bulletScript.maxDistance = calculatedMaxDistance;
+            }
         }
-        else if (currentWeaponType == WeaponType.Shotgun)
+        else if (currentWeapon.weaponType == WeaponType.Shotgun)
         {
-            SpawnShotgunPellets();
+            SpawnShotgunPellets(activeMuzzleEndPoint, calculatedMaxDistance);
         }
     }
 
     /// <summary>
     /// Coroutine to display the muzzle flash for a short duration.
     /// </summary>
+    /// <param name="muzzlePoint">The transform of the muzzle end point.</param>
     /// <returns>IEnumerator for coroutine execution.</returns>
-    private IEnumerator ShowMuzzleFlash()
+    private IEnumerator ShowMuzzleFlash(Transform muzzlePoint)
     {
-        if (muzzleFlashPrefab != null && muzzleEndPoint != null)
+        if (currentWeapon.muzzleFlashPrefab != null && muzzlePoint != null)
         {
             // Instantiate the muzzle flash at the muzzle end point's position and rotation.
             // Parent it to the muzzle end point so it moves/rotates with the gun.
-            GameObject flashInstance = Instantiate(muzzleFlashPrefab, muzzleEndPoint.position, muzzleEndPoint.rotation, muzzleEndPoint);
+            GameObject flashInstance = Instantiate(currentWeapon.muzzleFlashPrefab, muzzlePoint.position, muzzlePoint.rotation, muzzlePoint);
 
             // Ensure the flash is active (it should be by default if prefab is set up correctly).
             flashInstance.SetActive(true);
 
             // Wait for the specified duration.
-            yield return new WaitForSeconds(muzzleFlashDuration);
+            yield return new WaitForSeconds(currentWeapon.muzzleFlashDuration); // Use current weapon's muzzle flash duration.
 
             // Destroy the muzzle flash instance after its duration.
             Destroy(flashInstance);
@@ -148,40 +232,32 @@ public class WeaponController : MonoBehaviour
     }
 
     /// <summary>
-    /// Spawns a single bullet with the given rotation.
-    /// </summary>
-    /// <param name="rotation">The rotation of the spawned bullet.</param>
-    private void SpawnBullet(Quaternion rotation)
-    {
-        // Instantiate the bullet prefab at the muzzle end point's position and rotation.
-        // The bullet's own script will handle its movement.
-        Instantiate(bulletPrefab, muzzleEndPoint.position, rotation);
-    }
-
-    /// <summary>
     /// Spawns multiple pellets for a shotgun type weapon.
     /// </summary>
-    private void SpawnShotgunPellets()
+    /// <param name="muzzlePoint">The transform of the muzzle end point.</param>
+    /// <param name="calculatedMaxDistance">The calculated max travel distance for the bullets.</param>
+    private void SpawnShotgunPellets(Transform muzzlePoint, float calculatedMaxDistance)
     {
         // Calculate the starting angle for the spread.
         // If total spread is 10 degrees, start at -5 and end at +5 relative to gun's forward.
-        float startAngle = -shotgunSpreadAngle / 2f;
-        float angleIncrement = shotgunSpreadAngle / (shotgunPellets - 1); // Angle between each pellet.
+        float startAngle = -currentWeapon.shotgunSpreadAngle / 2f;
+        float angleIncrement = currentWeapon.shotgunSpreadAngle / (currentWeapon.shotgunPellets - 1); // Angle between each pellet.
 
-        // Loop to spawn each pellet.
-        for (int i = 0; i < shotgunPellets; i++)
+        for (int i = 0; i < currentWeapon.shotgunPellets; i++)
         {
-            // Calculate the current pellet's angle relative to the gun's forward direction.
             float currentAngleOffset = startAngle + i * angleIncrement;
+            // The muzzlePoint.rotation is the player's current aiming rotation.
+            // We apply the spread offset to this rotation.
+            Quaternion pelletRotation = muzzlePoint.rotation * Quaternion.Euler(0, 0, currentAngleOffset);
 
-            // Get the gun's current forward direction (which is transform.right if sprite faces right).
-            Vector2 gunForward = muzzleEndPoint.right; // Assuming muzzleEndPoint's right is its "forward" direction.
-
-            // Rotate the gun's forward direction by the current angle offset.
-            Quaternion pelletRotation = Quaternion.Euler(0, 0, transform.eulerAngles.z + currentAngleOffset);
-
-            // Spawn the bullet with the calculated spread rotation.
-            SpawnBullet(pelletRotation);
+            GameObject bulletInstance = Instantiate(currentWeapon.bulletPrefab, muzzlePoint.position, pelletRotation);
+            // Pass the damage and maxDistance to the bullet.
+            Bullet bulletScript = bulletInstance.GetComponent<Bullet>();
+            if (bulletScript != null)
+            {
+                bulletScript.damage = currentWeapon.damage;
+                bulletScript.maxDistance = calculatedMaxDistance;
+            }
         }
     }
 }

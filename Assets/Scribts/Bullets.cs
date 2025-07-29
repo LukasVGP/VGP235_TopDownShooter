@@ -9,18 +9,16 @@ public class Bullet : MonoBehaviour
     [SerializeField]
     private float speed = 20f; // How fast the bullet travels.
 
-    [SerializeField]
-    private float damage = 10f; // Damage dealt to enemies.
+    // Damage and MaxDistance are now set by the WeaponController when the bullet is spawned.
+    public float damage = 0f; // Initialized to 0, will be set by WeaponController.
+    public float maxDistance = 0f; // Initialized to 0, will be set by WeaponController.
 
-    [SerializeField]
-    private float maxDistance = 10f; // How far the bullet can travel before being destroyed.
-
-    [Header("Visuals")] // New header for visual settings
+    [Header("Visuals")]
     [SerializeField]
     private Sprite bulletSprite; // Assign the bullet's visual sprite here in the Inspector.
     private SpriteRenderer spriteRenderer; // Reference to the SpriteRenderer component.
 
-    [Header("Audio Settings")] // Added header for better organization in Inspector
+    [Header("Audio Settings")]
     [SerializeField]
     private AudioClip bulletSound; // Assign your bullet sound effect here.
     private AudioSource audioSource; // Reference to the AudioSource component.
@@ -77,8 +75,6 @@ public class Bullet : MonoBehaviour
     void Update()
     {
         // Move the bullet forward based on its current rotation.
-        // Using transform.right is often the "forward" direction for 2D sprites
-        // when they are rotated to point correctly.
         transform.position += transform.right * speed * Time.deltaTime;
 
         // Check if the bullet has traveled beyond its max distance.
@@ -95,16 +91,14 @@ public class Bullet : MonoBehaviour
     /// <param name="other">The other Collider2D involved in this collision.</param>
     void OnTriggerEnter2D(Collider2D other)
     {
-        // Check if the collided object is an enemy.
-        // You might want to use a specific tag like "Enemy" or a layer for enemies.
-        // For now, let's assume enemies have a Health component.
-        Health enemyHealth = other.GetComponent<Health>();
-        if (enemyHealth != null)
+        // Check if the collided object has a Health component (e.g., an enemy).
+        Health targetHealth = other.GetComponent<Health>();
+        if (targetHealth != null)
         {
-            enemyHealth.DoDamage(damage); // Apply damage to the enemy.
-            Destroy(gameObject); // Destroy the bullet after hitting an enemy.
+            targetHealth.DoDamage(damage); // Apply damage to the target.
+            Destroy(gameObject); // Destroy the bullet after hitting something with health.
         }
         // Optionally, destroy the bullet if it hits something else like a wall,
-        // but for now, it only destroys on enemy hit or max distance.
+        // but for now, it only destroys on health target hit or max distance.
     }
 }
