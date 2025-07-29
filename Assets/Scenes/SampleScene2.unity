@@ -366,7 +366,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 790, y: 456}
+  m_AnchoredPosition: {x: 945, y: 369}
   m_SizeDelta: {x: 200, y: 50}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &981135630
@@ -791,7 +791,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 2345904003979410956, guid: 40d02a197e74e924f839a5641e69decf, type: 3}
       propertyPath: weapons.Array.data[2].weaponType
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 2345904003979410956, guid: 40d02a197e74e924f839a5641e69decf, type: 3}
       propertyPath: weapons.Array.data[2].bulletPrefab
@@ -810,6 +810,10 @@ PrefabInstance:
       value: 
       objectReference: {fileID: 21300000, guid: f9c99854987244144a9c0a6967106f85, type: 3}
     - target: {fileID: 2345904003979410956, guid: 40d02a197e74e924f839a5641e69decf, type: 3}
+      propertyPath: weapons.Array.data[0].bulletRangeFraction
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 2345904003979410956, guid: 40d02a197e74e924f839a5641e69decf, type: 3}
       propertyPath: weapons.Array.data[2].bulletRangeFraction
       value: 1
       objectReference: {fileID: 0}
@@ -827,11 +831,11 @@ PrefabInstance:
       objectReference: {fileID: 1906816790}
     - target: {fileID: 3305218587435487693, guid: 40d02a197e74e924f839a5641e69decf, type: 3}
       propertyPath: m_LocalPosition.x
-      value: -1.9
+      value: -4.7
       objectReference: {fileID: 0}
     - target: {fileID: 3305218587435487693, guid: 40d02a197e74e924f839a5641e69decf, type: 3}
       propertyPath: m_LocalPosition.y
-      value: -0.029872954
+      value: 1.56
       objectReference: {fileID: 0}
     - target: {fileID: 3305218587435487693, guid: 40d02a197e74e924f839a5641e69decf, type: 3}
       propertyPath: m_LocalPosition.z
